@@ -1,6 +1,10 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { DossierStatus } from '../types';
+import { Dossier, DossierStatus } from '../types';
+
+interface DashboardProps {
+  dossiers: Dossier[];
+}
 
 const COLORS_STATUS = {
   [DossierStatus.NOUVEAU]: '#3b82f6', // Blue-500
@@ -13,7 +17,7 @@ const COLORS_SERVICE = [
   '#0ea5e9', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f59e0b', '#84cc16'
 ];
 
-export const Dashboard = ({ dossiers }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ dossiers }) => {
   // Filter out archived for stats usually, but let's keep active ones + this week's closed
   const activeDossiers = dossiers.filter(d => !d.isArchived);
 
@@ -24,7 +28,7 @@ export const Dashboard = ({ dossiers }) => {
   })).filter(d => d.value > 0);
 
   // Prepare Data for Service Chart (Dynamic aggregation since service is now free text)
-  const serviceCounts = {};
+  const serviceCounts: Record<string, number> = {};
   activeDossiers.forEach(d => {
     // Normalize string slightly (trim) to avoid duplicates like "Urbanisme " vs "Urbanisme"
     const s = d.service ? d.service.trim() : 'Non spécifié';
@@ -58,7 +62,7 @@ export const Dashboard = ({ dossiers }) => {
                     dataKey="value"
                   >
                     {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS_STATUS[entry.name]} />
+                      <Cell key={`cell-${index}`} fill={COLORS_STATUS[entry.name as DossierStatus]} />
                     ))}
                   </Pie>
                   <Tooltip />

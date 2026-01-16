@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getDossiers, saveDossiers, isDateInCurrentWeek, isDateInPastWeek } from './services/storageService';
-import { DossierStatus } from './types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { getDossiers, saveDossiers, isDateInCurrentWeek, isDateInPastWeek, exportDossiersToJSON, importDossiersFromJSON } from './services/storageService';
+import { Dossier, DossierStatus } from './types';
 import { Dashboard } from './components/Dashboard';
 import { DossierForm } from './components/DossierForm';
 import { DossierCard } from './components/DossierCard';
@@ -15,16 +15,20 @@ import {
   LogOut,
   Building2,
   Menu,
-  Inbox
+  Inbox,
+  Settings,
+  Download,
+  Upload,
+  Database
 } from 'lucide-react';
 
 // Login Component
-const LoginScreen = ({ onLogin }) => {
+const LoginScreen: React.FC<{onLogin: () => void}> = ({ onLogin }) => {
     const [id, setId] = useState('');
     const [pwd, setPwd] = useState('');
     const [error, setError] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (id === "Cabinet du maire" && pwd === "jenesaispas") {
             onLogin();
@@ -74,22 +78,24 @@ const LoginScreen = ({ onLogin }) => {
     )
 }
 
-const View = {
-    DASHBOARD: 'Dashboard',
-    CREATE: 'Créer une demande',
-    INCOMING: 'Nouveaux Dossiers',
-    TRANSMITTED: 'Transmise',
-    RDV: 'RDV',
-    CLOSED: 'Clôturé',
-    WEEKLY: 'Récap Hebdo',
-    HISTORY: 'Historique'
-};
+enum View {
+    DASHBOARD = 'Dashboard',
+    CREATE = 'Créer une demande', // Previously NEW
+    INCOMING = 'Nouveaux Dossiers', // New View for list of new dossiers
+    TRANSMITTED = 'Transmise',
+    RDV = 'RDV',
+    CLOSED = 'Clôturé',
+    WEEKLY = 'Récap Hebdo',
+    HISTORY = 'Historique',
+    SETTINGS = 'Paramètres'
+}
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [dossiers, setDossiers] = useState([]);
-  const [currentView, setCurrentView] = useState(View.DASHBOARD);
+  const [dossiers, setDossiers] = useState<Dossier[]>([]);
+  const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load data on mount
   useEffect(() => {
@@ -106,25 +112,68 @@ export default function App() {
     setDossiers(updated);
   }, []);
 
-  const handleUpdateDossier = (updatedDossier) => {
-    const newDossiers = dossiers.map(d => d.id === updatedDossier.id ? updatedDossier : d);
-    setDossiers(newDossiers);
-    saveDossiers(newDossiers);
-  };
-
-  const handleCreateDossier = (newDossier) => {
-    const newDossiers = [newDossier, ...dossiers];
-    setDossiers(newDossiers);
-    saveDossiers(newDossiers);
-    setCurrentView(View.INCOMING); // Redirect to the list of new dossiers
-  };
-
-  const handleDeleteDossier = (id) => {
-      if(window.confirm("Êtes-vous sûr de vouloir supprimer ce dossier définitivement ?")) {
-        const newDossiers = dossiers.filter(d => d.id !== id);
-        setDossiers(newDossiers);
+  const handleUpdateDossier = (updatedDossier: Dossier) => {
+    setDossiers(prevDossiers => {
+        const newDossiers = prevDossiers.map(d => d.id === updatedDossier.id ? updatedDossier : d);
         saveDossiers(newDossiers);
+        return newDossiers;
+    });
+  };
+
+  const handleCreateDossier = (newDossier: Dossier) => {
+    setDossiers(prevDossiers => {
+        const newDossiers = [newDossier, ...prevDossiers];
+        saveDossiers(newDossiers);
+        return newDossiers;
+    });
+    setCurrentView(View.INCOMING); 
+  };
+
+  const handleDeleteDossier = (id: string) => {
+      setTimeout(() => {
+          if(window.confirm("Êtes-vous sûr de vouloir supprimer ce dossier définitivement ?")) {
+            setDossiers(prevDossiers => {
+                const newDossiers = prevDossiers.filter(d => d.id !== id);
+                saveDossiers(newDossiers);
+                return newDossiers;
+            });
+          }
+      }, 50);
+  };
+
+  // Export Data Logic
+  const handleExportData = () => {
+      const jsonString = exportDossiersToJSON();
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sauvegarde_mairie_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
+  // Import Data Logic
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+              const content = event.target?.result as string;
+              if (window.confirm("ATTENTION : Cette action va remplacer toutes les données actuelles par celles du fichier. Voulez-vous continuer ?")) {
+                  const imported = importDossiersFromJSON(content);
+                  if (imported) {
+                      setDossiers(imported);
+                      alert("Importation réussie !");
+                  } else {
+                      alert("Erreur : Le fichier est invalide ou corrompu.");
+                  }
+              }
+          };
+          reader.readAsText(file);
       }
+      if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // Views Logic
@@ -153,7 +202,7 @@ export default function App() {
   }, [dossiers, currentView]);
 
 
-  const SidebarItem = ({ view, icon: Icon, label, colorClass }) => (
+  const SidebarItem = ({ view, icon: Icon, label, colorClass }: any) => (
       <button 
         onClick={() => { setCurrentView(view); setMobileMenuOpen(false); }}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 mb-1
@@ -200,6 +249,9 @@ export default function App() {
             
             <SidebarItem view={View.WEEKLY} icon={History} label="Récap Hebdo" colorClass="bg-indigo-600" />
             <SidebarItem view={View.HISTORY} icon={Archive} label="Historique" colorClass="bg-slate-500" />
+
+            <div className="my-4 border-t border-gray-100"></div>
+            <SidebarItem view={View.SETTINGS} icon={Settings} label="Paramètres" colorClass="bg-gray-700" />
         </nav>
 
         <button onClick={() => setIsLoggedIn(false)} className="flex items-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg mt-4 transition">
@@ -234,6 +286,7 @@ export default function App() {
                 <SidebarItem view={View.CLOSED} icon={CheckCircle} label="Clôturé" colorClass="bg-green-600" />
                 <SidebarItem view={View.WEEKLY} icon={History} label="Récap Hebdo" colorClass="bg-indigo-600" />
                 <SidebarItem view={View.HISTORY} icon={Archive} label="Historique" colorClass="bg-slate-500" />
+                <SidebarItem view={View.SETTINGS} icon={Settings} label="Paramètres" colorClass="bg-gray-700" />
              </div>
         )}
 
@@ -246,8 +299,76 @@ export default function App() {
             </div>
         )}
 
+        {/* Settings View */}
+        {currentView === View.SETTINGS && (
+            <div className="max-w-4xl mx-auto space-y-6">
+                 <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                    <Settings className="text-gray-600" />
+                    Paramètres de l'application
+                </h2>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="bg-blue-100 p-3 rounded-full">
+                            <Database className="text-blue-600" size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-800">Synchronisation et Sauvegarde</h3>
+                            <p className="text-gray-500 text-sm">Gérez le transfert des données entre différents ordinateurs.</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
+                        <p className="text-sm text-yellow-800">
+                            <strong>Note importante :</strong> Cette application fonctionne en mode "autonome" (sans serveur central). 
+                            Pour partager les données entre deux ordinateurs, vous devez <strong>exporter</strong> les données du premier ordinateur, 
+                            transférer le fichier (clé USB, email, réseau partagé) puis l'<strong>importer</strong> sur le second ordinateur.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="border border-gray-100 rounded-xl p-6 bg-gray-50 flex flex-col items-center text-center hover:shadow-md transition">
+                            <Download size={48} className="text-green-600 mb-4" />
+                            <h4 className="font-semibold text-gray-800 mb-2">Exporter les données</h4>
+                            <p className="text-sm text-gray-500 mb-6">
+                                Télécharge un fichier de sauvegarde (.json) contenant tous les dossiers actuels.
+                            </p>
+                            <button 
+                                onClick={handleExportData}
+                                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium w-full"
+                            >
+                                Sauvegarder / Exporter
+                            </button>
+                        </div>
+
+                        <div className="border border-gray-100 rounded-xl p-6 bg-gray-50 flex flex-col items-center text-center hover:shadow-md transition">
+                            <Upload size={48} className="text-orange-500 mb-4" />
+                            <h4 className="font-semibold text-gray-800 mb-2">Importer une sauvegarde</h4>
+                            <p className="text-sm text-gray-500 mb-6">
+                                Charge les données depuis un fichier. <br/>
+                                <span className="text-red-500 text-xs font-bold uppercase">Attention : Écrase les données actuelles.</span>
+                            </p>
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition font-medium w-full"
+                            >
+                                Charger / Restaurer
+                            </button>
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleImportData} 
+                                accept=".json"
+                                className="hidden" 
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Render List for all other views (Incoming, Transmitted, RDV, Closed, Weekly, History) */}
-        {currentView !== View.DASHBOARD && currentView !== View.CREATE && (
+        {currentView !== View.DASHBOARD && currentView !== View.CREATE && currentView !== View.SETTINGS && (
             <div className="space-y-6">
                  <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-gray-800">

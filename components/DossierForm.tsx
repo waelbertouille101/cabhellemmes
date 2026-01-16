@@ -1,21 +1,14 @@
-import React, { useState, useRef, ChangeEvent } from 'react';
-import { DossierStatus } from '../types';
+import React, { useState, useRef } from 'react';
+import { Dossier, DossierStatus, Attachment } from '../types';
 import { Upload, X, Paperclip } from 'lucide-react';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
-interface Attachment {
-  id: string;
-  name: string;
-  type: string;
-  content: string;
-}
-
 interface DossierFormProps {
-  onSubmit: (dossier: any) => void;
+  onSubmit: (dossier: Dossier) => void;
 }
 
-export const DossierForm = ({ onSubmit }: DossierFormProps) => {
+export const DossierForm: React.FC<DossierFormProps> = ({ onSubmit }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -27,15 +20,15 @@ export const DossierForm = ({ onSubmit }: DossierFormProps) => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
-      files.forEach((file) => {
+      files.forEach((file: File) => {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64String = reader.result as string;
@@ -62,7 +55,7 @@ export const DossierForm = ({ onSubmit }: DossierFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newDossier = {
+    const newDossier: Dossier = {
       id: generateId(),
       ...formData,
       status: DossierStatus.NOUVEAU,

@@ -1,28 +1,6 @@
 import React, { useState } from 'react';
-import { DossierStatus } from '../types';
+import { Dossier, DossierStatus, Attachment } from '../types';
 import { Calendar, User, Mail, FileText, Trash2, Paperclip, ChevronRight, Save, Download, X } from 'lucide-react';
-
-interface Attachment {
-  id: string;
-  name: string;
-  type: string;
-  content: string;
-}
-
-interface Dossier {
-  id: string;
-  createdAt: number;
-  updatedAt: number;
-  status: string;
-  object: string;
-  service: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  description: string;
-  rdvDetails?: string;
-  attachments: Attachment[];
-}
 
 interface DossierCardProps {
   dossier: Dossier;
@@ -31,18 +9,18 @@ interface DossierCardProps {
   readOnly?: boolean;
 }
 
-export const DossierCard = ({ dossier, onUpdate, onDelete, readOnly = false }: DossierCardProps) => {
+export const DossierCard: React.FC<DossierCardProps> = ({ dossier, onUpdate, onDelete, readOnly = false }) => {
   const [rdvWho, setRdvWho] = useState(dossier.rdvDetails || '');
   const [isEditingRdv, setIsEditingRdv] = useState(false);
 
-  const statusColors: Record<string, string> = {
+  const statusColors = {
     [DossierStatus.NOUVEAU]: 'bg-blue-100 text-blue-800 border-blue-200',
     [DossierStatus.TRANSMIS]: 'bg-orange-100 text-orange-800 border-orange-200',
     [DossierStatus.RDV]: 'bg-purple-100 text-purple-800 border-purple-200',
     [DossierStatus.CLOTURE]: 'bg-green-100 text-green-800 border-green-200',
   };
 
-  const handleStatusChange = (newStatus: string) => {
+  const handleStatusChange = (newStatus: DossierStatus) => {
     onUpdate({ ...dossier, status: newStatus, updatedAt: Date.now() });
   };
 
@@ -71,26 +49,29 @@ export const DossierCard = ({ dossier, onUpdate, onDelete, readOnly = false }: D
   const serviceTextColor = dossier.status === DossierStatus.NOUVEAU ? 'text-black' : 'text-blue-600';
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition duration-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition duration-200 overflow-hidden relative">
       <div className="p-5">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusColors[dossier.status] || 'bg-gray-100'}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusColors[dossier.status]}`}>
               {dossier.status}
             </span>
             <span className="ml-2 text-xs text-gray-400">
               {new Date(dossier.createdAt).toLocaleDateString()}
             </span>
           </div>
-          {!readOnly && (
-            <button 
-                onClick={() => onDelete(dossier.id)}
-                className="text-gray-400 hover:text-red-500 transition"
-                title="Supprimer le dossier"
-            >
-                <Trash2 size={18} />
-            </button>
-          )}
+          {/* Suppression améliorée : z-index, padding, type=button */}
+          <button 
+              type="button"
+              onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(dossier.id);
+              }}
+              className="p-2 -mr-2 text-gray-500 hover:text-red-600 transition rounded-full hover:bg-red-50 z-10 cursor-pointer"
+              title="Supprimer le dossier"
+          >
+              <Trash2 size={20} />
+          </button>
         </div>
 
         <h3 className="text-lg font-bold text-gray-800 mb-1">{dossier.object}</h3>

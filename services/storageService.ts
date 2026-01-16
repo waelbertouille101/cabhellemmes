@@ -1,6 +1,8 @@
+import { Dossier } from '../types';
+
 const STORAGE_KEY = 'mairie_manager_dossiers_v1';
 
-export const getDossiers = () => {
+export const getDossiers = (): Dossier[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? JSON.parse(stored) : [];
@@ -10,7 +12,7 @@ export const getDossiers = () => {
   }
 };
 
-export const saveDossiers = (dossiers) => {
+export const saveDossiers = (dossiers: Dossier[]): void => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dossiers));
   } catch (e) {
@@ -18,8 +20,31 @@ export const saveDossiers = (dossiers) => {
   }
 };
 
+// Fonctions pour l'export/import (Synchronisation manuelle)
+export const exportDossiersToJSON = (): string => {
+    const dossiers = getDossiers();
+    return JSON.stringify(dossiers, null, 2);
+};
+
+export const importDossiersFromJSON = (jsonString: string): Dossier[] | null => {
+    try {
+        const parsed = JSON.parse(jsonString);
+        if (Array.isArray(parsed)) {
+            // Vérification basique de la structure (on regarde si le premier élément a un ID)
+            if (parsed.length === 0 || parsed[0].id) {
+                saveDossiers(parsed);
+                return parsed;
+            }
+        }
+        return null;
+    } catch (e) {
+        console.error("Erreur lors de l'import", e);
+        return null;
+    }
+};
+
 // Helper to check if a date is in the current week (Monday to Sunday)
-export const isDateInCurrentWeek = (date) => {
+export const isDateInCurrentWeek = (date: Date): boolean => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const dayOfWeek = today.getDay(); // 0 (Sun) to 6 (Sat)
@@ -37,7 +62,7 @@ export const isDateInCurrentWeek = (date) => {
   return date >= monday && date < nextMonday;
 };
 
-export const isDateInPastWeek = (date) => {
+export const isDateInPastWeek = (date: Date): boolean => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const dayOfWeek = today.getDay(); 
@@ -47,4 +72,4 @@ export const isDateInPastWeek = (date) => {
     monday.setDate(today.getDate() - diffToMonday);
     
     return date < monday;
-};
+}
