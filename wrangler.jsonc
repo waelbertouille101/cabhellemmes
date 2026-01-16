@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nom-de-l-employe",
+  "compatibility_date": "2026-01-16",
+  "assets": {
+    "directory": "./dist"
+  }
+}
